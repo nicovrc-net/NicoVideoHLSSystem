@@ -110,7 +110,7 @@ public class Main {
         }).start();
 
         while (true) {
-            DatagramSocket sock;
+            DatagramSocket sock = null;
             try {
                 sock = new DatagramSocket(25251);
 
@@ -221,11 +221,11 @@ public class Main {
                 for (String str : video_m3u8.split("\n")){
                     if (str.startsWith("#")){
                         if (str.startsWith("#EXT-X-MAP")){
-                            sb.append("#EXT-X-MAP:URI=\"init01.cmfv\"\n");
+                            sb.append("#EXT-X-MAP:URI=\"https://n.nicovrc.net/video/"+fileId+"/video/init01.cmfv\"\n");
                             continue;
                         }
                         if (str.startsWith("#EXT-X-KEY")){
-                            sb.append("#EXT-X-KEY:METHOD=AES-128,URI=\"key.key\",IV=").append(VideoKeyIV).append("\n");
+                            sb.append("#EXT-X-KEY:METHOD=AES-128,URI=\"https://n.nicovrc.net/video/"+fileId+"/video/key.key\",IV=").append(VideoKeyIV).append("\n");
                             continue;
                         }
                         sb.append(str).append("\n");
@@ -243,11 +243,11 @@ public class Main {
                 for (String str : audio_m3u8.split("\n")){
                     if (str.startsWith("#")){
                         if (str.startsWith("#EXT-X-MAP")){
-                            sb2.append("#EXT-X-MAP:URI=\"init01.cmfa\"\n");
+                            sb2.append("#EXT-X-MAP:URI=\"https://n.nicovrc.net/video/"+fileId+"/audio/init01.cmfa\"\n");
                             continue;
                         }
                         if (str.startsWith("#EXT-X-KEY")){
-                            sb2.append("#EXT-X-KEY:METHOD=AES-128,URI=\"key.key\",IV=").append(AudioKeyIV).append("\n");
+                            sb2.append("#EXT-X-KEY:METHOD=AES-128,URI=\"https://n.nicovrc.net/video/"+fileId+"/audio/key.key\",IV=").append(AudioKeyIV).append("\n");
                             continue;
                         }
                         sb2.append(str).append("\n");
@@ -269,6 +269,10 @@ public class Main {
                 m3u8_stream2.flush();
                 m3u8_stream2.close();
 
+                boolean[] b = {false, false};
+
+                //System.out.println("DL開始(proxy "+inputData.getProxy()+") : " + new Date().getTime());
+
                 new Thread(()->{
                     try {
                         Request request_init = new Request.Builder()
@@ -283,23 +287,19 @@ public class Main {
                             stream.close();
                         }
                         response_init.close();
-                    } catch (Exception e){
-                        //e.printStackTrace();
-                    }
 
-                    try {
-                        Request request_init = new Request.Builder()
+                        Request request_key = new Request.Builder()
                                 .url(VideoKeyURL)
                                 .addHeader("Cookie", "nicosid="+nicosid+"; domand_bid=" + domand_bid)
                                 .build();
-                        Response response_init = client.newCall(request_init).execute();
-                        if (response_init.body() != null){
-                            byte[] bytes = response_init.body().bytes();
+                        Response response_key = client.newCall(request_key).execute();
+                        if (response_key.body() != null){
+                            byte[] bytes = response_key.body().bytes();
                             FileOutputStream stream = new FileOutputStream(videoPass + "key.key");
                             stream.write(bytes);
                             stream.close();
                         }
-                        response_init.close();
+                        response_key.close();
                     } catch (Exception e){
                         //e.printStackTrace();
                     }
@@ -309,29 +309,33 @@ public class Main {
                         try {
                             //System.out.println("- "+url+" --");
                             // https://asset.domand.nicovideo.jp/655c8569f16a0601757053f4/video/12/video-h264-720p/01.cmfv
-                            Request request = new Request.Builder()
-                                    .url(url)
-                                    .addHeader("Cookie", "nicosid="+nicosid+"; domand_bid=" + domand_bid)
-                                    .build();
-                            Response response = client.newCall(request).execute();
-                            if (response.body() != null){
-                                //System.out.println(response.code());
-                                byte[] bytes = response.body().bytes();
-                                FileOutputStream stream = new FileOutputStream(videoPass + x + ".cmfv");
-                                stream.write(bytes);
-                                stream.close();
+                            try {
+                                Request request = new Request.Builder()
+                                        .url(url)
+                                        .addHeader("Cookie", "nicosid="+nicosid+"; domand_bid=" + domand_bid)
+                                        .build();
+                                Response response = client.newCall(request).execute();
+                                if (response.body() != null){
+                                    //System.out.println(response.code());
+                                    byte[] bytes = response.body().bytes();
+                                    FileOutputStream stream = new FileOutputStream(videoPass + x + ".cmfv");
+                                    stream.write(bytes);
+                                    stream.close();
+                                }
+                                response.close();
+                            } catch (Exception e){
+                                e.printStackTrace();
                             }
-                            response.close();
-
                             x++;
                         } catch (Exception e){
                             //e.printStackTrace();
                         }
                     }
+                    b[0] = true;
                 }).start();
 
+                // 音声
                 new Thread(()->{
-                    // 音声
                     try {
                         Request request_init = new Request.Builder()
                                 .url(AudioInitURL)
@@ -345,24 +349,20 @@ public class Main {
                             stream.close();
                         }
                         response_init.close();
-                    } catch (Exception e){
-                        //e.printStackTrace();
-                    }
 
-                    try {
-                        //System.out.println(AudioKeyURL);
-                        Request request_init = new Request.Builder()
+                        Request request_key = new Request.Builder()
                                 .url(AudioKeyURL)
                                 .addHeader("Cookie", "nicosid="+nicosid+"; domand_bid=" + domand_bid)
                                 .build();
-                        Response response_init = client.newCall(request_init).execute();
-                        if (response_init.body() != null){
-                            byte[] bytes = response_init.body().bytes();
+                        Response response_key = client.newCall(request_key).execute();
+                        if (response_key.body() != null){
+                            byte[] bytes = response_key.body().bytes();
                             FileOutputStream stream = new FileOutputStream(audioPass + "key.key");
                             stream.write(bytes);
                             stream.close();
                         }
-                        response_init.close();
+                        response_key.close();
+
                     } catch (Exception e){
                         //e.printStackTrace();
                     }
@@ -372,44 +372,81 @@ public class Main {
                         try {
                             //System.out.println("- "+url+" --");
                             // https://asset.domand.nicovideo.jp/655c8569f16a0601757053f4/video/12/video-h264-720p/01.cmfv
-                            Request request = new Request.Builder()
-                                    .url(url)
-                                    .addHeader("Cookie", "nicosid="+nicosid+"; domand_bid=" + domand_bid)
-                                    .build();
-                            Response response = client.newCall(request).execute();
-                            if (response.body() != null){
-                                //System.out.println(response.code());
-                                byte[] bytes = response.body().bytes();
-                                FileOutputStream stream = new FileOutputStream(audioPass + y + ".cmfa");
-                                stream.write(bytes);
-                                stream.close();
+                            try {
+                                try {
+                                    Request request = new Request.Builder()
+                                            .url(url)
+                                            .addHeader("Cookie", "nicosid="+nicosid+"; domand_bid=" + domand_bid)
+                                            .build();
+                                    Response response = client.newCall(request).execute();
+                                    if (response.body() != null){
+                                        //System.out.println(response.code());
+                                        byte[] bytes = response.body().bytes();
+                                        FileOutputStream stream = new FileOutputStream(audioPass + y + ".cmfa");
+                                        stream.write(bytes);
+                                        stream.close();
+                                    }
+                                    response.close();
+                                } catch (Exception e){
+                                    e.printStackTrace();
+                                }
+                            } catch (Exception e){
+                                //e.printStackTrace();
                             }
-                            response.close();
 
                             y++;
                         } catch (Exception e){
                             //e.printStackTrace();
                         }
                     }
+
+                    /*String str = "/bin/ffmpeg -i https://n.nicovrc.net/video/"+fileId+"/audio/audio.m3u8 -c:v copy -c:a copy -f hls -hls_time 6 -hls_playlist_type vod -hls_segment_filename " + basePass + "audio/video%3d.ts " + basePass + "audio/audio2.m3u8";
+                    try {
+                        ProcessBuilder builder1 = new ProcessBuilder(str.split(" "));
+                        Process start = builder1.start();
+                        start.waitFor();
+                    } catch (Exception e){
+                        //e.printStackTrace();
+                    }*/
+                    b[1] = true;
                 }).start();
 
-                // くっつけたm3u8を用意
-                String m3u8 = "#EXTM3U\n" +
-                        "#EXT-X-VERSION:6\n" +
-                        "#EXT-X-INDEPENDENT-SEGMENTS\n" +
-                        "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"audio/audio.m3u8\"\n" +
-                        "#EXT-X-STREAM-INF:AUDIO=\"audio-aac-64kbps\"\n" +
-                        "video/video.m3u8";
-
-                //System.out.println(m3u8);
-                FileOutputStream stream = new FileOutputStream(basePass + "main.m3u8");
-                stream.write(m3u8.getBytes(StandardCharsets.UTF_8));
-                stream.close();
+                /*while (!b[0] || !b[1]){
+                    //System.out.println("a");
+                    //System.out.println(b[0] + " / " + b[1]);
+                }*/
 
                 Thread.sleep(2000L);
+                //while (!b[1]){
+                //    //System.out.println("a");
+                //}
+
+                try {
+                    //System.out.println(json.getAsJsonObject().get("MainM3U8").getAsString());
+                    // くっつけたm3u8を用意
+                    Matcher matcher = Pattern.compile("#EXT-X-STREAM-INF:BANDWIDTH=(\\d+),AVERAGE-BANDWIDTH=(\\d+),CODECS=\"(.+)\",RESOLUTION=(.+),FRAME-RATE=(.+),AUDIO=\"(.+)\"").matcher(json.getAsJsonObject().get("MainM3U8").getAsString());
+
+                    String m3u8 = "";
+
+                    if (matcher.find()){
+                        m3u8 = "#EXTM3U\n" +
+                                "#EXT-X-VERSION:6\n" +
+                                "#EXT-X-INDEPENDENT-SEGMENTS\n" +
+                                "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"https://n.nicovrc.net/video/"+fileId+"/audio/audio.m3u8\"\n" +
+                                "#EXT-X-STREAM-INF:BANDWIDTH="+matcher.group(1)+",AVERAGE-BANDWIDTH="+matcher.group(2)+",CODECS=\""+matcher.group(3)+"\",RESOLUTION="+matcher.group(4)+",FRAME-RATE="+matcher.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
+                                "https://n.nicovrc.net/video/"+fileId+"/video/video.m3u8";
+                    }
+
+                    System.out.println(m3u8);
+                    FileOutputStream stream = new FileOutputStream(basePass + "main.m3u8");
+                    stream.write(m3u8.getBytes(StandardCharsets.UTF_8));
+                    stream.close();
+                } catch (Exception e){
+                    //e.printStackTrace();
+                }
 
                 // VRC上で再生するにはffmpegで整える
-                String str = "/bin/ffmpeg -allowed_extensions ALL -i " + basePass + "main.m3u8 -c:v copy -c:a copy -f hls -hls_time 6 -hls_playlist_type vod -hls_segment_filename " + basePass + "video%3d.ts " + basePass + "video.m3u8";
+                /*String str = "/bin/ffmpeg -i https://n.nicovrc.net/video/"+fileId+"/main.m3u8 -c:v copy -c:a copy -f hls -hls_time 6 -hls_playlist_type vod -hls_segment_filename " + basePass + "video%3d.ts " + basePass + "video.m3u8";
                 System.out.println(str);
 
                 try {
@@ -450,15 +487,24 @@ public class Main {
                         }
                     }
                     new File("./" + fileId).delete();
-                }).start();
+                }).start();*/
 
 
-                byte[] bytes = ("https://n.nicovrc.net/video/"+fileId+"/video.m3u8").getBytes(StandardCharsets.UTF_8);
+
+                byte[] bytes = ("https://n.nicovrc.net/video/"+fileId+"/main.m3u8").getBytes(StandardCharsets.UTF_8);
                 InetSocketAddress address = new InetSocketAddress(packet.getAddress(), packet.getPort());
                 sock.send(new DatagramPacket(bytes, bytes.length, address));
                 sock.close();
+
+
             } catch (Exception e){
                 e.printStackTrace();
+                if (sock != null){
+                    sock.close();
+                }
+            }
+            if (sock != null){
+                sock.close();
             }
         }
     }
