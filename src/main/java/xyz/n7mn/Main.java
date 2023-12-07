@@ -437,59 +437,21 @@ public class Main {
                                 "https://n.nicovrc.net/video/"+fileId+"/video/video.m3u8";
                     }
 
-                    System.out.println(m3u8);
-                    FileOutputStream stream = new FileOutputStream(basePass + "main.m3u8");
+                    //System.out.println(m3u8);
+                    FileOutputStream stream = new FileOutputStream(basePass + "sub.m3u8");
                     stream.write(m3u8.getBytes(StandardCharsets.UTF_8));
                     stream.close();
                 } catch (Exception e){
                     //e.printStackTrace();
                 }
 
-                // VRC上で再生するにはffmpegで整える
-                /*String str = "/bin/ffmpeg -i https://n.nicovrc.net/video/"+fileId+"/main.m3u8 -c:v copy -c:a copy -f hls -hls_time 6 -hls_playlist_type vod -hls_segment_filename " + basePass + "video%3d.ts " + basePass + "video.m3u8";
-                System.out.println(str);
-
-                try {
-                    ProcessBuilder builder1 = new ProcessBuilder(str.split(" "));
-                    Process start = builder1.start();
-                    start.waitFor();
-                    int exitCode = start.exitValue();
-
-                    System.out.println(exitCode);
-                    System.out.println(new String(start.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-                new Thread(()->{
-                    try {
-                        Thread.sleep(86400000L);
-                    } catch (Exception e){
-                        //e.printStackTrace();
-                    }
-
-                    for (File files : new File("./" + fileId).listFiles()) {
-                        if (files.isDirectory()){
-                            for (File listFile : files.listFiles()) {
-                                if (listFile.isDirectory()){
-                                    for (File listedFile : listFile.listFiles()) {
-                                        listedFile.delete();
-                                    }
-                                    listFile.delete();
-                                } else {
-                                    listFile.delete();
-                                }
-                            }
-                            files.delete();
-                        } else {
-                            files.delete();
-                        }
-                    }
-                    new File("./" + fileId).delete();
-                }).start();*/
-
-
+                // VRC上で再生する用のdummyなm3u8を生成する
+                String m3u8 = "#EXTM3U\n" +
+                        "" +
+                        "https://n.nicovrc.net/video/"+fileId+"/sub.m3u8";
+                FileOutputStream stream = new FileOutputStream(basePass + "main.m3u8");
+                stream.write(m3u8.getBytes(StandardCharsets.UTF_8));
+                stream.close();
 
                 byte[] bytes = ("https://n.nicovrc.net/video/"+fileId+"/main.m3u8").getBytes(StandardCharsets.UTF_8);
                 InetSocketAddress address = new InetSocketAddress(packet.getAddress(), packet.getPort());
