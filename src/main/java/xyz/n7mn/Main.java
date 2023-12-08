@@ -23,8 +23,7 @@ public class Main {
             try {
                 ServerSocket svSock = new ServerSocket(25251);
 
-                boolean[] t = {true};
-                while (t[0]) {
+                while (true) {
                     Socket sock = svSock.accept();
                     new Thread(() -> {
                         try {
@@ -100,12 +99,12 @@ public class Main {
                             in.close();
                             sock.close();
                         } catch (Exception e) {
-                            t[0] = false;
+                            e.printStackTrace();
                         }
                     }).start();
                 }
             } catch (Exception e){
-                e.printStackTrace();
+                //e.printStackTrace();
             }
         }).start();
 
