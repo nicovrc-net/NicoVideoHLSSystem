@@ -18,6 +18,51 @@ public class Main {
 
     public static void main(String[] args) {
 
+        // 定期お掃除
+        new Thread(()->{
+            Timer timer = new Timer();
+            timer.scheduleAtFixedRate(new TimerTask() {
+                @Override
+                public void run() {
+                    File file = new File("./");
+                    for (File f : Objects.requireNonNull(file.listFiles())) {
+                        Matcher matcher = Pattern.compile("(\\d+)_(.+)").matcher(f.getName());
+                        if (matcher.find()){
+                            Long l = Long.parseLong(matcher.group(1));
+                            long time = new Date().getTime();
+
+                            if (time - l >= 86400000){
+                                if (f.isFile()){
+                                    return;
+                                }
+
+                                File[] files = f.listFiles();
+                                for (File fi : files){
+                                    if (fi.getName().startsWith(".")){
+                                        continue;
+                                    }
+
+                                    if (fi.isDirectory()){
+                                        for (File fil : fi.listFiles()){
+                                            if (fil.isDirectory()){
+                                                for (File file1 : fi.listFiles()){
+                                                    file1.delete();
+                                                }
+                                            } else {
+                                                fil.delete();
+                                            }
+                                        }
+                                    } else {
+                                        fi.delete();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }, 0L, 10000L);
+        }).start();
+
         // HTTP通信受け取り
         new Thread(()->{
             try {
