@@ -158,10 +158,16 @@ public class Main {
             ServerSocket svSock = new ServerSocket(25250);
             while (true) {
                 try {
+                    //System.out.println("受信待機");
                     Socket sock = svSock.accept();
                     new Thread(() -> {
                         try {
-                            byte[] bytes = sock.getInputStream().readAllBytes();
+                            System.out.println("受信");
+                            byte[] data = new byte[1024768];
+                            int readSize = sock.getInputStream().read(data);
+                            byte[] bytes = Arrays.copyOf(data, readSize);
+                            //System.out.println(bytes.length);
+                            //System.out.println(new String(bytes, StandardCharsets.UTF_8));
                             if (bytes.length == 0) {
                                 sock.close();
                                 return;
