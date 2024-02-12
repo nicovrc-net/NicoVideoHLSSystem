@@ -59,6 +59,7 @@ public class Main {
 
                                     f.delete();
                                 }
+                                f.delete();
                             }
                         }
                     }
