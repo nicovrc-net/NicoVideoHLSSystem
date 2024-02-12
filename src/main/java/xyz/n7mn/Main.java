@@ -468,6 +468,9 @@ public class Main {
                                     Matcher matcher = Pattern.compile("#EXT-X-STREAM-INF:BANDWIDTH=(\\d+),AVERAGE-BANDWIDTH=(\\d+),CODECS=\"(.+)\",RESOLUTION=(.+),FRAME-RATE=(.+),AUDIO=\"(.+)\"").matcher(json.getAsJsonObject().get("MainM3U8").getAsString());
 
                                     String m3u8 = "";
+                                    String m3u8_2 = "#EXTM3U\n" +
+                                            "\n" +
+                                            "https://n.nicovrc.net/video/"+fileId+"/sub.m3u8";
 
                                     if (matcher.find()){
                                         m3u8 = "#EXTM3U\n" +
@@ -476,6 +479,13 @@ public class Main {
                                                 "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"https://n.nicovrc.net/video/"+fileId+"/audio/audio.m3u8\"\n" +
                                                 "#EXT-X-STREAM-INF:BANDWIDTH="+matcher.group(1)+",AVERAGE-BANDWIDTH="+matcher.group(2)+",CODECS=\""+matcher.group(3)+"\",RESOLUTION="+matcher.group(4)+",FRAME-RATE="+matcher.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
                                                 "https://n.nicovrc.net/video/"+fileId+"/video/video.m3u8";
+
+                                        m3u8_2 = "#EXTM3U\n" +
+                                                "#EXT-X-VERSION:6\n" +
+                                                "#EXT-X-INDEPENDENT-SEGMENTS\n" +
+                                                "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"https://n.nicovrc.net/video/"+fileId+"/audio/audio.m3u8\"\n" +
+                                                "#EXT-X-STREAM-INF:BANDWIDTH="+matcher.group(1)+",AVERAGE-BANDWIDTH="+matcher.group(2)+",CODECS=\""+matcher.group(3)+"\",RESOLUTION="+matcher.group(4)+",FRAME-RATE="+matcher.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
+                                                "https://n.nicovrc.net/video/"+fileId+"/sub.m3u8";
                                     }
 
                                     //System.out.println(m3u8);
@@ -484,9 +494,6 @@ public class Main {
                                     stream.close();
 
                                     // VRC上で再生する用のdummyなm3u8を生成する
-                                    String m3u8_2 = "#EXTM3U\n" +
-                                            "\n" +
-                                            "https://n.nicovrc.net/video/"+fileId+"/sub.m3u8";
                                     FileOutputStream stream2 = new FileOutputStream(basePass + "main.m3u8");
                                     stream2.write(m3u8_2.getBytes(StandardCharsets.UTF_8));
                                     stream2.close();
