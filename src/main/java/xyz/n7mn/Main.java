@@ -49,10 +49,12 @@ public class Main {
                                                 for (File file1 : fi.listFiles()){
                                                     file1.delete();
                                                 }
+                                                fi.delete();
                                             } else {
                                                 fil.delete();
                                             }
                                         }
+                                        fi.delete();
                                     } else {
                                         fi.delete();
                                     }
