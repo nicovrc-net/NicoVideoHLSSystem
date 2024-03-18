@@ -17,6 +17,7 @@ public class Main {
     private static final OkHttpClient.Builder builder = new OkHttpClient.Builder();
 
     private static final HashMap<String, InputData> CookieList = new HashMap<>();
+    private static final HashMap<String, String> CookieIDList = new HashMap<>();
 
     public static void main(String[] args) {
 
@@ -30,10 +31,17 @@ public class Main {
                     for (File f : Objects.requireNonNull(file.listFiles())) {
                         Matcher matcher = Pattern.compile("(\\d+)_(.+)").matcher(f.getName());
                         if (matcher.find()){
-                            Long l = Long.parseLong(matcher.group(1));
+                            String timeStr = matcher.group(1);
+                            String timeId = matcher.group(2);
+                            Long l = Long.parseLong(timeStr);
                             long time = new Date().getTime();
 
                             if ((time - l) >= 86400000L){
+                                String s = CookieIDList.get(timeStr + "_" + timeId);
+                                if (s != null){
+                                    CookieList.remove(s);
+                                    CookieIDList.remove(timeStr + "_" + timeId);
+                                }
                                 //System.out.println(time - l);
                                 if (f.isFile()){
                                     continue;
@@ -387,6 +395,7 @@ public class Main {
 
                                     CookieList.put(CookieID, inputData);
                                     //System.out.println("de1 : " + CookieID);
+                                    CookieIDList.put(fileId, CookieID);
 
                                 } catch (Exception e){
                                     //e.printStackTrace();
