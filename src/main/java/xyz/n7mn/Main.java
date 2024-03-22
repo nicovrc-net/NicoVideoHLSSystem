@@ -163,12 +163,29 @@ public class Main {
                                 final String RequestHeader = matcher3.group(1);
                                 final String temp = matcher3.group(2);
                                 final String[] split = temp.split("&HostURL=");
+                                if (split.length != 2){
+                                    out.write(("HTTP/"+httpVersion+" 404 Not Found\nContent-Type: text/plain; charset=utf-8\n\n404").getBytes(StandardCharsets.UTF_8));
+                                    out.flush();
+                                    out.close();
+                                    in.close();
+                                    sock.close();
+                                    return;
+                                }
                                 final String RequestURI = split[0];
                                 //System.out.println(RequestURI);
                                 final String RequestHost = split[1];
                                 InputData inputData = CookieList.get(RequestURI.split("/")[1]);
                                 if (inputData == null){
                                     inputData = CookieList.get(RequestURI.split("/")[2]);
+                                }
+
+                                if (inputData == null){
+                                    out.write(("HTTP/"+httpVersion+" 404 Not Found\nContent-Type: text/plain; charset=utf-8\n\n404").getBytes(StandardCharsets.UTF_8));
+                                    out.flush();
+                                    out.close();
+                                    in.close();
+                                    sock.close();
+                                    return;
                                 }
                                 //System.out.println(inputData);
                                 final OkHttpClient client = inputData.getProxy() != null ? builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(inputData.getProxy().split(":")[0], Integer.parseInt(inputData.getProxy().split(":")[1])))).build() : new OkHttpClient();
