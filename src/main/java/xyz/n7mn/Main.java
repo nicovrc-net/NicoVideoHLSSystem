@@ -107,13 +107,13 @@ public class Main {
 
                             final String httpVersion = "1." + (matcher2.find() ? matcher2.group(1) : "1");
 
-                            //System.out.println(httpRequest);
+                            System.out.println(httpRequest);
 
                             if (matcher1.find()) {
 
                                 String group = matcher1.group(2);
                                 File file = new File("./" + group.replaceAll("%22","").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
-                                System.out.println("./" + group.replaceAll("%22","").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
+                                //System.out.println("./" + group.replaceAll("%22","").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
                                 if (file.exists() && !file.isDirectory()){
                                     String ContentType = "application/octet-stream";
                                     if (file.getName().endsWith("m3u8")){
@@ -164,6 +164,7 @@ public class Main {
                                 final String temp = matcher3.group(2);
                                 final String[] split = temp.split("&HostURL=");
                                 final String RequestURI = split[0];
+                                //System.out.println(RequestURI);
                                 final String RequestHost = split[1];
                                 InputData inputData = CookieList.get(RequestURI.split("/")[1]);
                                 if (inputData == null){
@@ -245,165 +246,177 @@ public class Main {
                             final String fileId = new Date().getTime() + "_" + split[0];
                             final String basePass = "./" + fileId + "/";
                             File file1 = new File(basePass);
-                            new Thread(()->{
+                            InputData inputData = new Gson().fromJson(s, InputData.class);
+                            final OkHttpClient client = inputData.getProxy() != null ? builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(inputData.getProxy().split(":")[0], Integer.parseInt(inputData.getProxy().split(":")[1])))).build() : new OkHttpClient();
 
-                                InputData inputData = new Gson().fromJson(s, InputData.class);
-                                final OkHttpClient client = inputData.getProxy() != null ? builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(inputData.getProxy().split(":")[0], Integer.parseInt(inputData.getProxy().split(":")[1])))).build() : new OkHttpClient();
+                            JsonElement json = new Gson().fromJson(inputData.getCookie(), JsonElement.class);
 
-                                JsonElement json = new Gson().fromJson(inputData.getCookie(), JsonElement.class);
+                            String nicosid = json.getAsJsonObject().get("nicosid").getAsString();
+                            String domand_bid = json.getAsJsonObject().get("domand_bid").getAsString();
 
-                                String nicosid = json.getAsJsonObject().get("nicosid").getAsString();
-                                String domand_bid = json.getAsJsonObject().get("domand_bid").getAsString();
+                            String video_m3u8 = "";
+                            String audio_m3u8 = "";
+                            try {
+                                Request request_video_m3u8 = new Request.Builder()
+                                        .url(inputData.getVideoURL())
+                                        .addHeader("Cookie", "nicosid="+nicosid+"; domand_bid=" + domand_bid)
+                                        .build();
+                                Response response1 = client.newCall(request_video_m3u8).execute();
 
-                                String video_m3u8 = "";
-                                String audio_m3u8 = "";
-                                try {
-                                    Request request_video_m3u8 = new Request.Builder()
-                                            .url(inputData.getVideoURL())
-                                            .addHeader("Cookie", "nicosid="+nicosid+"; domand_bid=" + domand_bid)
-                                            .build();
-                                    Response response1 = client.newCall(request_video_m3u8).execute();
-
-                                    if (response1.body() != null){
-                                        video_m3u8 = response1.body().string();
-                                    }
-                                    //System.out.println(video_m3u8);
-                                    response1.close();
-
-                                    Request request_audio_m3u8 = new Request.Builder()
-                                            .url(inputData.getAudioURL())
-                                            .addHeader("Cookie", "nicosid="+nicosid+"; domand_bid=" + domand_bid)
-                                            .build();
-                                    Response response2 = client.newCall(request_audio_m3u8).execute();
-
-                                    if (response2.body() != null){
-                                        audio_m3u8 = response2.body().string();
-                                    }
-                                    response2.close();
-                                } catch (Exception e){
-                                    //e.printStackTrace();
+                                if (response1.body() != null){
+                                    video_m3u8 = response1.body().string();
                                 }
+                                //System.out.println(video_m3u8);
+                                response1.close();
 
-                                if (!file1.exists()){
-                                    file1.mkdir();
+                                Request request_audio_m3u8 = new Request.Builder()
+                                        .url(inputData.getAudioURL())
+                                        .addHeader("Cookie", "nicosid="+nicosid+"; domand_bid=" + domand_bid)
+                                        .build();
+                                Response response2 = client.newCall(request_audio_m3u8).execute();
+
+                                if (response2.body() != null){
+                                    audio_m3u8 = response2.body().string();
                                 }
+                                response2.close();
+                            } catch (Exception e){
+                                //e.printStackTrace();
+                            }
 
-                                String CookieID = null;
+                            if (!file1.exists()){
+                                file1.mkdir();
+                            }
 
-                                StringBuilder sb = new StringBuilder();
-                                for (String str : video_m3u8.split("\n")){
-                                    if (str.startsWith("#")){
-                                        Matcher matcher = Pattern.compile("#EXT-X-MAP:URI=\"(.+)\"").matcher(str);
-                                        Matcher matcher2 = Pattern.compile("#EXT-X-KEY:METHOD=AES-128,URI=\"(.+)\",IV=(.+)").matcher(str);
-                                        if (matcher.find()){
-                                            sb.append("#EXT-X-MAP:URI=\"").append(matcher.group(1).replaceAll("asset\\.domand\\.nicovideo\\.jp", "n.nicovrc.net")).append("&HostURL=").append(str.split("/")[2]).append("\"\n");
-                                            continue;
-                                        }
-                                        if (matcher2.find()){
-                                            sb.append("#EXT-X-KEY:METHOD=AES-128,URI=\"").append(matcher2.group(1).replaceAll("delivery\\.domand\\.nicovideo\\.jp", "n.nicovrc.net")).append("&HostURL=").append(str.split("/")[2]).append("\",IV=").append(matcher2.group(2)).append("\n");
-                                            continue;
-                                        }
-                                        sb.append(str).append("\n");
-                                        continue;
-                                    }
+                            String CookieID = null;
 
-                                    //System.out.println(str);
-                                    sb.append(str.replaceAll("asset\\.domand\\.nicovideo\\.jp", "n.nicovrc.net")).append("&HostURL=").append(str.split("/")[2]).append("\n");
-                                    if (CookieID == null){
-                                        CookieID = str.split("/")[3];
-                                    }
-                                }
-
-                                //System.out.println(sb.toString());
-                                video_m3u8 = sb.toString();
-
-                                StringBuilder sb2 = new StringBuilder();
-                                for (String str : audio_m3u8.split("\n")){
-
-                                    if (str.startsWith("#")){
-                                        Matcher matcher = Pattern.compile("#EXT-X-MAP:URI=\"(.+)\"").matcher(str);
-                                        Matcher matcher2 = Pattern.compile("#EXT-X-KEY:METHOD=AES-128,URI=\"(.+)\",IV=(.+)").matcher(str);
-                                        if (matcher.find()){
-                                            sb2.append("#EXT-X-MAP:URI=\"").append(matcher.group(1).replaceAll("asset\\.domand\\.nicovideo\\.jp", "n.nicovrc.net")).append("&HostURL=").append(str.split("/")[2]).append("\"\n");
-                                            continue;
-                                        }
-                                        if (matcher2.find()){
-                                            sb2.append("#EXT-X-KEY:METHOD=AES-128,URI=\"").append(matcher2.group(1).replaceAll("delivery\\.domand\\.nicovideo\\.jp", "n.nicovrc.net")).append("&HostURL=").append(str.split("/")[2]).append("\",IV=").append(matcher2.group(2)).append("\n");
-                                            continue;
-                                        }
-
-                                        sb2.append(str).append("\n");
-                                        continue;
-                                    }
-
-                                    //System.out.println(str);
-                                    sb2.append(str.replaceAll("asset\\.domand\\.nicovideo\\.jp", "n.nicovrc.net")).append("&HostURL=").append(str.split("/")[2]).append("\n");
-                                }
-                                audio_m3u8 = sb2.toString();
-
-                                try {
-
-                                    FileOutputStream m3u8_stream = new FileOutputStream( basePass + "video.m3u8");
-                                    m3u8_stream.write(video_m3u8.getBytes(StandardCharsets.UTF_8));
-                                    m3u8_stream.flush();
-                                    m3u8_stream.close();
-
-                                    FileOutputStream m3u8_stream2 = new FileOutputStream(basePass + "audio.m3u8");
-                                    m3u8_stream2.write(audio_m3u8.getBytes(StandardCharsets.UTF_8));
-                                    m3u8_stream2.flush();
-                                    m3u8_stream2.close();
-                                } catch (Exception e){{
-                                    // e.printStackTrace();
-                                }}
-                                //System.out.println("DL開始(proxy "+inputData.getProxy()+") : " + new Date().getTime());
-
-                                try {
-                                    //System.out.println(json.getAsJsonObject().get("MainM3U8").getAsString());
-                                    // くっつけたm3u8を用意
-                                    Matcher matcher = Pattern.compile("#EXT-X-STREAM-INF:BANDWIDTH=(\\d+),AVERAGE-BANDWIDTH=(\\d+),CODECS=\"(.+)\",RESOLUTION=(.+),FRAME-RATE=(.+),AUDIO=\"(.+)\"").matcher(json.getAsJsonObject().get("MainM3U8").getAsString());
-
-                                    String m3u8 = "";
-                                    String m3u8_2 = "#EXTM3U\n" +
-                                            "\n" +
-                                            "https://n.nicovrc.net/video/"+fileId+"/sub.m3u8";
-
+                            StringBuilder sb = new StringBuilder();
+                            for (String str : video_m3u8.split("\n")){
+                                if (str.startsWith("#")){
+                                    Matcher matcher = Pattern.compile("#EXT-X-MAP:URI=\"(.+)\"").matcher(str);
+                                    Matcher matcher2 = Pattern.compile("#EXT-X-KEY:METHOD=AES-128,URI=\"(.+)\",IV=(.+)").matcher(str);
                                     if (matcher.find()){
-                                        m3u8 = "#EXTM3U\n" +
-                                                "#EXT-X-VERSION:6\n" +
-                                                "#EXT-X-INDEPENDENT-SEGMENTS\n" +
-                                                "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"/video/"+fileId+"/audio.m3u8\"\n" +
-                                                "#EXT-X-STREAM-INF:BANDWIDTH="+matcher.group(1)+",AVERAGE-BANDWIDTH="+matcher.group(2)+",CODECS=\""+matcher.group(3)+"\",RESOLUTION="+matcher.group(4)+",FRAME-RATE="+matcher.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
-                                                "/video/"+fileId+"/video.m3u8";
+                                        sb.append("#EXT-X-MAP:URI=\"").append(matcher.group(1).replaceAll("https://asset\\.domand\\.nicovideo\\.jp", "")).append("&HostURL=").append(str.split("/")[2]).append("\"\n");
+                                        continue;
+                                    }
+                                    if (matcher2.find()){
+                                        sb.append("#EXT-X-KEY:METHOD=AES-128,URI=\"").append(matcher2.group(1).replaceAll("https://delivery\\.domand\\.nicovideo\\.jp", "")).append("&HostURL=").append(str.split("/")[2]).append("\",IV=").append(matcher2.group(2)).append("\n");
+                                        continue;
+                                    }
+                                    sb.append(str).append("\n");
+                                    continue;
+                                }
 
-                                        m3u8_2 = "#EXTM3U\n" +
-                                                "#EXT-X-VERSION:6\n" +
-                                                "#EXT-X-INDEPENDENT-SEGMENTS\n" +
-                                                "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"/video/"+fileId+"/audio.m3u8\"\n" +
-                                                "#EXT-X-STREAM-INF:BANDWIDTH="+matcher.group(1)+",AVERAGE-BANDWIDTH="+matcher.group(2)+",CODECS=\""+matcher.group(3)+"\",RESOLUTION="+matcher.group(4)+",FRAME-RATE="+matcher.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
-                                                "https://n.nicovrc.net/video/"+fileId+"/sub.m3u8";
+                                //System.out.println(str);
+                                sb.append(str.replaceAll("https://asset\\.domand\\.nicovideo\\.jp", "")).append("&HostURL=").append(str.split("/")[2]).append("\n");
+                                if (CookieID == null){
+                                    CookieID = str.split("/")[3];
+                                }
+                            }
+
+                            //System.out.println(sb.toString());
+                            video_m3u8 = sb.toString();
+
+                            StringBuilder sb2 = new StringBuilder();
+                            for (String str : audio_m3u8.split("\n")){
+
+                                if (str.startsWith("#")){
+                                    Matcher matcher = Pattern.compile("#EXT-X-MAP:URI=\"(.+)\"").matcher(str);
+                                    Matcher matcher2 = Pattern.compile("#EXT-X-KEY:METHOD=AES-128,URI=\"(.+)\",IV=(.+)").matcher(str);
+                                    if (matcher.find()){
+                                        sb2.append("#EXT-X-MAP:URI=\"").append(matcher.group(1).replaceAll("https://asset\\.domand\\.nicovideo\\.jp", "")).append("&HostURL=").append(str.split("/")[2]).append("\"\n");
+                                        continue;
+                                    }
+                                    if (matcher2.find()){
+                                        sb2.append("#EXT-X-KEY:METHOD=AES-128,URI=\"").append(matcher2.group(1).replaceAll("https://delivery\\.domand\\.nicovideo\\.jp", "")).append("&HostURL=").append(str.split("/")[2]).append("\",IV=").append(matcher2.group(2)).append("\n");
+                                        continue;
                                     }
 
-                                    //System.out.println(m3u8);
-                                    FileOutputStream stream = new FileOutputStream(basePass + "sub.m3u8");
-                                    stream.write(m3u8.getBytes(StandardCharsets.UTF_8));
-                                    stream.close();
-
-                                    // VRC上で再生する用のdummyなm3u8を生成する
-                                    FileOutputStream stream2 = new FileOutputStream(basePass + "main.m3u8");
-                                    stream2.write(m3u8_2.getBytes(StandardCharsets.UTF_8));
-                                    stream2.close();
-
-                                    CookieList.put(CookieID, inputData);
-                                    //System.out.println("de1 : " + CookieID);
-                                    CookieIDList.put(fileId, CookieID);
-
-                                } catch (Exception e){
-                                    //e.printStackTrace();
+                                    sb2.append(str).append("\n");
+                                    continue;
                                 }
-                            }).start();
 
-                            Thread.sleep(1000L);
-                            byte[] byte_o = ("https://n.nicovrc.net/video/"+fileId+"/main.m3u8").getBytes(StandardCharsets.UTF_8);
+                                //System.out.println(str);
+                                sb2.append(str.replaceAll("https://asset\\.domand\\.nicovideo\\.jp", "")).append("&HostURL=").append(str.split("/")[2]).append("\n");
+                            }
+                            audio_m3u8 = sb2.toString();
+
+                            try {
+
+                                FileOutputStream m3u8_stream = new FileOutputStream( basePass + "video.m3u8");
+                                m3u8_stream.write(video_m3u8.getBytes(StandardCharsets.UTF_8));
+                                m3u8_stream.flush();
+                                m3u8_stream.close();
+
+                                FileOutputStream m3u8_stream2 = new FileOutputStream(basePass + "audio.m3u8");
+                                m3u8_stream2.write(audio_m3u8.getBytes(StandardCharsets.UTF_8));
+                                m3u8_stream2.flush();
+                                m3u8_stream2.close();
+                            } catch (Exception e){{
+                                // e.printStackTrace();
+                            }}
+                            //System.out.println("DL開始(proxy "+inputData.getProxy()+") : " + new Date().getTime());
+
+                            try {
+                                //System.out.println(json.getAsJsonObject().get("MainM3U8").getAsString());
+                                // くっつけたm3u8を用意
+                                Matcher matcher = Pattern.compile("#EXT-X-STREAM-INF:BANDWIDTH=(\\d+),AVERAGE-BANDWIDTH=(\\d+),CODECS=\"(.+)\",RESOLUTION=(.+),FRAME-RATE=(.+),AUDIO=\"(.+)\"").matcher(json.getAsJsonObject().get("MainM3U8").getAsString());
+
+                                String m3u8 = "";
+                                String m3u8_2 = "#EXTM3U\n" +
+                                        "\n" +
+                                        "https://n.nicovrc.net/video/"+fileId+"/sub.m3u8";
+
+                                if (matcher.find()){
+                                    m3u8 = "#EXTM3U\n" +
+                                            "#EXT-X-VERSION:6\n" +
+                                            "#EXT-X-INDEPENDENT-SEGMENTS\n" +
+                                            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"/video/"+fileId+"/audio.m3u8\"\n" +
+                                            "#EXT-X-STREAM-INF:BANDWIDTH="+matcher.group(1)+",AVERAGE-BANDWIDTH="+matcher.group(2)+",CODECS=\""+matcher.group(3)+"\",RESOLUTION="+matcher.group(4)+",FRAME-RATE="+matcher.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
+                                            "/video/"+fileId+"/video.m3u8";
+
+                                    m3u8_2 = "#EXTM3U\n" +
+                                            "#EXT-X-VERSION:6\n" +
+                                            "#EXT-X-INDEPENDENT-SEGMENTS\n" +
+                                            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"/video/"+fileId+"/audio.m3u8\"\n" +
+                                            "#EXT-X-STREAM-INF:BANDWIDTH="+matcher.group(1)+",AVERAGE-BANDWIDTH="+matcher.group(2)+",CODECS=\""+matcher.group(3)+"\",RESOLUTION="+matcher.group(4)+",FRAME-RATE="+matcher.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
+                                            "/video/"+fileId+"/sub.m3u8";
+                                }
+
+                                //System.out.println(m3u8);
+                                FileOutputStream stream = new FileOutputStream(basePass + "sub.m3u8");
+                                stream.write(m3u8.getBytes(StandardCharsets.UTF_8));
+                                stream.close();
+
+                                // VRC上で再生する用のdummyなm3u8を生成する
+                                FileOutputStream stream2 = new FileOutputStream(basePass + "main.m3u8");
+                                stream2.write(m3u8_2.getBytes(StandardCharsets.UTF_8));
+                                stream2.close();
+
+                                CookieList.put(CookieID, inputData);
+                                //System.out.println("de1 : " + CookieID);
+                                CookieIDList.put(fileId, CookieID);
+
+                            } catch (Exception e){
+                                //e.printStackTrace();
+                            }
+
+                            String host = "n.nicovrc.net";
+                            if (new File("./host.txt").exists()){
+                                StringBuilder lines = new StringBuilder();
+                                try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(new File("./host.txt")), StandardCharsets.UTF_8));){
+                                    String str;
+
+                                    while ((str = reader.readLine()) != null) {
+                                        lines.append(str).append("\n");
+                                    }
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+
+                                host = lines.toString().replaceAll("\n","");
+                            }
+
+                            byte[] byte_o = ("https://"+host+"/video/"+fileId+"/main.m3u8").getBytes(StandardCharsets.UTF_8);
                             sock.getOutputStream().write(byte_o);
                             sock.getOutputStream().flush();
                             sock.close();
