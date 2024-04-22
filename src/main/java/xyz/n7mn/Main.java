@@ -19,6 +19,16 @@ public class Main {
     private static final HashMap<String, InputData> CookieList = new HashMap<>();
     private static final HashMap<String, String> CookieIDList = new HashMap<>();
 
+    private static final Pattern matcher_1 = Pattern.compile("(\\d+)_(.+)");
+
+    private static final Pattern matcher_2 = Pattern.compile("(GET|HEAD) /video/(.+) HTTP");
+    private static final Pattern matcher_3 = Pattern.compile("HTTP/1\\.(\\d)");
+    private static final Pattern matcher_4 = Pattern.compile("(GET|HEAD) (.+) HTTP");
+
+    private static final Pattern matcher_5 = Pattern.compile("#EXT-X-MAP:URI=\"(.+)\"");
+    private static final Pattern matcher_6 = Pattern.compile("#EXT-X-KEY:METHOD=AES-128,URI=\"(.+)\",IV=(.+)");
+    private static final Pattern matcher_7 = Pattern.compile("#EXT-X-STREAM-INF:BANDWIDTH=(\\d+),AVERAGE-BANDWIDTH=(\\d+),CODECS=\"(.+)\",RESOLUTION=(.+),FRAME-RATE=(.+),AUDIO=\"(.+)\"");
+
     public static void main(String[] args) {
 
         // 定期お掃除
@@ -29,7 +39,7 @@ public class Main {
                 public void run() {
                     File file = new File("./");
                     for (File f : Objects.requireNonNull(file.listFiles())) {
-                        Matcher matcher = Pattern.compile("(\\d+)_(.+)").matcher(f.getName());
+                        Matcher matcher = matcher_1.matcher(f.getName());
                         if (matcher.find()){
                             String timeStr = matcher.group(1);
                             String timeId = matcher.group(2);
@@ -101,9 +111,9 @@ public class Main {
 
                             final String httpRequest = new String(data, StandardCharsets.UTF_8);
 
-                            Matcher matcher1 = Pattern.compile("(GET|HEAD) /video/(.+) HTTP").matcher(httpRequest);
-                            Matcher matcher2 = Pattern.compile("HTTP/1\\.(\\d)").matcher(httpRequest);
-                            Matcher matcher3 = Pattern.compile("(GET|HEAD) (.+) HTTP").matcher(httpRequest);
+                            Matcher matcher1 = matcher_2.matcher(httpRequest);
+                            Matcher matcher2 = matcher_3.matcher(httpRequest);
+                            Matcher matcher3 = matcher_4.matcher(httpRequest);
 
                             final String httpVersion = "1." + (matcher2.find() ? matcher2.group(1) : "1");
 
@@ -309,8 +319,8 @@ public class Main {
                             StringBuilder sb = new StringBuilder();
                             for (String str : video_m3u8.split("\n")){
                                 if (str.startsWith("#")){
-                                    Matcher matcher = Pattern.compile("#EXT-X-MAP:URI=\"(.+)\"").matcher(str);
-                                    Matcher matcher2 = Pattern.compile("#EXT-X-KEY:METHOD=AES-128,URI=\"(.+)\",IV=(.+)").matcher(str);
+                                    Matcher matcher = matcher_5.matcher(str);
+                                    Matcher matcher2 = matcher_6.matcher(str);
                                     if (matcher.find()){
                                         sb.append("#EXT-X-MAP:URI=\"").append(matcher.group(1).replaceAll("https://asset\\.domand\\.nicovideo\\.jp", "")).append("&HostURL=").append(str.split("/")[2]).append("\"\n");
                                         continue;
@@ -337,8 +347,8 @@ public class Main {
                             for (String str : audio_m3u8.split("\n")){
 
                                 if (str.startsWith("#")){
-                                    Matcher matcher = Pattern.compile("#EXT-X-MAP:URI=\"(.+)\"").matcher(str);
-                                    Matcher matcher2 = Pattern.compile("#EXT-X-KEY:METHOD=AES-128,URI=\"(.+)\",IV=(.+)").matcher(str);
+                                    Matcher matcher = matcher_5.matcher(str);
+                                    Matcher matcher2 = matcher_6.matcher(str);
                                     if (matcher.find()){
                                         sb2.append("#EXT-X-MAP:URI=\"").append(matcher.group(1).replaceAll("https://asset\\.domand\\.nicovideo\\.jp", "")).append("&HostURL=").append(str.split("/")[2]).append("\"\n");
                                         continue;
@@ -376,7 +386,7 @@ public class Main {
                             try {
                                 //System.out.println(json.getAsJsonObject().get("MainM3U8").getAsString());
                                 // くっつけたm3u8を用意
-                                Matcher matcher = Pattern.compile("#EXT-X-STREAM-INF:BANDWIDTH=(\\d+),AVERAGE-BANDWIDTH=(\\d+),CODECS=\"(.+)\",RESOLUTION=(.+),FRAME-RATE=(.+),AUDIO=\"(.+)\"").matcher(json.getAsJsonObject().get("MainM3U8").getAsString());
+                                Matcher matcher = matcher_7.matcher(json.getAsJsonObject().get("MainM3U8").getAsString());
 
                                 String m3u8 = "";
                                 String m3u8_2 = "#EXTM3U\n" +
