@@ -18,6 +18,9 @@ public class Main {
 
     private static final HashMap<String, InputData> CookieList = new HashMap<>();
     private static final HashMap<String, String> CookieIDList = new HashMap<>();
+    private static final HashMap<String, String> m3u8List = new HashMap<>();
+    private static final HashMap<String, String> m3u8VideoList = new HashMap<>();
+    private static final HashMap<String, String> m3u8AudioList = new HashMap<>();
 
     private static final Pattern matcher_1 = Pattern.compile("(\\d+)_(.+)");
 
@@ -37,54 +40,30 @@ public class Main {
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
-                    File file = new File("./");
-                    for (File f : Objects.requireNonNull(file.listFiles())) {
-                        Matcher matcher = matcher_1.matcher(f.getName());
+
+                    final HashMap<String, String> temp = new HashMap<>(m3u8List);
+
+                    temp.forEach((id, m3u8)->{
+                        final Matcher matcher = matcher_1.matcher(id);
                         if (matcher.find()){
-                            String timeStr = matcher.group(1);
-                            String timeId = matcher.group(2);
-                            Long l = Long.parseLong(timeStr);
-                            long time = new Date().getTime();
-
-                            if ((time - l) >= 86400000L){
-                                String s = CookieIDList.get(timeStr + "_" + timeId);
-                                if (s != null){
-                                    CookieList.remove(s);
-                                    CookieIDList.remove(timeStr + "_" + timeId);
-                                }
-                                //System.out.println(time - l);
-                                if (f.isFile()){
-                                    continue;
-                                }
-
-                                File[] files = f.listFiles();
-                                for (File fi : files){
-                                    if (fi.getName().startsWith(".")){
-                                        continue;
-                                    }
-
-                                    if (fi.isDirectory()){
-                                        for (File fil : fi.listFiles()){
-                                            if (fil.isDirectory()){
-                                                for (File file1 : fi.listFiles()){
-                                                    file1.delete();
-                                                }
-                                                fi.delete();
-                                            } else {
-                                                fil.delete();
-                                            }
-                                        }
-                                        fi.delete();
-                                    } else {
-                                        fi.delete();
-                                    }
-
-                                    f.delete();
-                                }
-                                f.delete();
-                            }
+                            return;
                         }
-                    }
+                        final String timeStr = matcher.group(1);
+                        long l = Long.parseLong(timeStr);
+                        long time = new Date().getTime();
+
+                        if ((time - l) >= 86400000L){
+                            String s = CookieIDList.get(id);
+                            if (s != null){
+                                CookieIDList.remove(id);
+                                CookieList.remove(id);
+                            }
+                            m3u8List.remove(id);
+                            m3u8VideoList.remove(id);
+                            m3u8AudioList.remove(id);
+                        }
+
+                    });
                 }
             }, 0L, 10000L);
         }).start();
@@ -122,7 +101,55 @@ public class Main {
                             if (matcher1.find()) {
 
                                 String group = matcher1.group(2);
-                                File file = new File("./" + group.replaceAll("%22","").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
+                                Matcher matcher = matcher_1.matcher("./" + group.replaceAll("%22", "").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
+
+
+                                if (matcher.find()){
+                                    String fileId = matcher.group(1) + "_" + matcher.group(2).split("/")[0];
+                                    System.out.println(fileId);
+                                    String s = m3u8List.get(fileId);
+                                    if (s != null){
+                                        //System.out.println("---- debug");
+                                        //System.out.println(s);
+                                        //System.out.println("---- ");
+                                        Matcher matcher4 = matcher_7.matcher(s);
+                                        String ContentType = "application/vnd.apple.mpegurl";
+                                        String m3u8Text = "";
+                                        if (matcher4.find()){
+                                            m3u8Text = "#EXTM3U\n" +
+                                                    "#EXT-X-VERSION:6\n" +
+                                                    "#EXT-X-INDEPENDENT-SEGMENTS\n" +
+                                                    "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"/video/"+fileId+"/audio.m3u8\"\n" +
+                                                    "#EXT-X-STREAM-INF:BANDWIDTH="+matcher4.group(1)+",AVERAGE-BANDWIDTH="+matcher4.group(2)+",CODECS=\""+matcher4.group(3)+"\",RESOLUTION="+matcher4.group(4)+",FRAME-RATE="+matcher4.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
+                                                    "/video/"+fileId+"/sub.m3u8";
+                                        }
+
+                                        if (group.endsWith("main.m3u8")){
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: "+ContentType+";\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
+                                        } else if (group.endsWith("sub.m3u8")) {
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: "+ContentType+";\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(s.getBytes(StandardCharsets.UTF_8));
+                                        } else if (group.endsWith("video.m3u8")) {
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: "+ContentType+";\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(m3u8VideoList.get(fileId).getBytes(StandardCharsets.UTF_8));
+                                        } else if (group.endsWith("audio.m3u8")) {
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: "+ContentType+";\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(m3u8AudioList.get(fileId).getBytes(StandardCharsets.UTF_8));
+                                        } else {
+                                            out.write(("HTTP/"+httpVersion+" 404 Not Found\nContent-Type: text/plain; charset=utf-8\n\n404").getBytes(StandardCharsets.UTF_8));
+                                        }
+
+                                        out.flush();
+                                        out.close();
+                                        in.close();
+                                        sock.close();
+
+                                        return;
+                                    }
+                                }
+
+                                File file = new File("./" + group.replaceAll("%22", "").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
                                 //System.out.println("./" + group.replaceAll("%22","").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
                                 if (file.exists() && !file.isDirectory()){
                                     String ContentType = "application/octet-stream";
@@ -271,8 +298,6 @@ public class Main {
                             // 前準備
                             String[] split = UUID.randomUUID().toString().split("-");
                             final String fileId = new Date().getTime() + "_" + split[0];
-                            final String basePass = "./" + fileId + "/";
-                            File file1 = new File(basePass);
                             InputData inputData = new Gson().fromJson(s, InputData.class);
                             final OkHttpClient client = inputData.getProxy() != null ? builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(inputData.getProxy().split(":")[0], Integer.parseInt(inputData.getProxy().split(":")[1])))).build() : new OkHttpClient();
 
@@ -308,10 +333,6 @@ public class Main {
                                 response2.close();
                             } catch (Exception e){
                                 //e.printStackTrace();
-                            }
-
-                            if (!file1.exists()){
-                                file1.mkdir();
                             }
 
                             String CookieID = null;
@@ -367,21 +388,8 @@ public class Main {
                             }
                             audio_m3u8 = sb2.toString();
 
-                            try {
-
-                                FileOutputStream m3u8_stream = new FileOutputStream( basePass + "video.m3u8");
-                                m3u8_stream.write(video_m3u8.getBytes(StandardCharsets.UTF_8));
-                                m3u8_stream.flush();
-                                m3u8_stream.close();
-
-                                FileOutputStream m3u8_stream2 = new FileOutputStream(basePass + "audio.m3u8");
-                                m3u8_stream2.write(audio_m3u8.getBytes(StandardCharsets.UTF_8));
-                                m3u8_stream2.flush();
-                                m3u8_stream2.close();
-                            } catch (Exception e){{
-                                // e.printStackTrace();
-                            }}
-                            //System.out.println("DL開始(proxy "+inputData.getProxy()+") : " + new Date().getTime());
+                            m3u8VideoList.put(fileId, video_m3u8);
+                            m3u8AudioList.put(fileId, audio_m3u8);
 
                             try {
                                 //System.out.println(json.getAsJsonObject().get("MainM3U8").getAsString());
@@ -389,9 +397,6 @@ public class Main {
                                 Matcher matcher = matcher_7.matcher(json.getAsJsonObject().get("MainM3U8").getAsString());
 
                                 String m3u8 = "";
-                                String m3u8_2 = "#EXTM3U\n" +
-                                        "\n" +
-                                        "https://n.nicovrc.net/video/"+fileId+"/sub.m3u8";
 
                                 if (matcher.find()){
                                     m3u8 = "#EXTM3U\n" +
@@ -400,28 +405,13 @@ public class Main {
                                             "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"/video/"+fileId+"/audio.m3u8\"\n" +
                                             "#EXT-X-STREAM-INF:BANDWIDTH="+matcher.group(1)+",AVERAGE-BANDWIDTH="+matcher.group(2)+",CODECS=\""+matcher.group(3)+"\",RESOLUTION="+matcher.group(4)+",FRAME-RATE="+matcher.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
                                             "/video/"+fileId+"/video.m3u8";
-
-                                    m3u8_2 = "#EXTM3U\n" +
-                                            "#EXT-X-VERSION:6\n" +
-                                            "#EXT-X-INDEPENDENT-SEGMENTS\n" +
-                                            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"/video/"+fileId+"/audio.m3u8\"\n" +
-                                            "#EXT-X-STREAM-INF:BANDWIDTH="+matcher.group(1)+",AVERAGE-BANDWIDTH="+matcher.group(2)+",CODECS=\""+matcher.group(3)+"\",RESOLUTION="+matcher.group(4)+",FRAME-RATE="+matcher.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
-                                            "/video/"+fileId+"/sub.m3u8";
                                 }
-
-                                //System.out.println(m3u8);
-                                FileOutputStream stream = new FileOutputStream(basePass + "sub.m3u8");
-                                stream.write(m3u8.getBytes(StandardCharsets.UTF_8));
-                                stream.close();
-
-                                // VRC上で再生する用のdummyなm3u8を生成する
-                                FileOutputStream stream2 = new FileOutputStream(basePass + "main.m3u8");
-                                stream2.write(m3u8_2.getBytes(StandardCharsets.UTF_8));
-                                stream2.close();
 
                                 CookieList.put(CookieID, inputData);
                                 //System.out.println("de1 : " + CookieID);
                                 CookieIDList.put(fileId, CookieID);
+
+                                m3u8List.put(fileId, m3u8);
 
                             } catch (Exception e){
                                 //e.printStackTrace();
