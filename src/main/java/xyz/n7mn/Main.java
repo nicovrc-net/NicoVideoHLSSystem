@@ -1,10 +1,14 @@
 package xyz.n7mn;
 
+import com.amihaiemil.eoyaml.Yaml;
+import com.amihaiemil.eoyaml.YamlMapping;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
 
 import java.io.*;
 import java.net.*;
@@ -16,11 +20,7 @@ import java.util.regex.Pattern;
 public class Main {
     private static final OkHttpClient.Builder builder = new OkHttpClient.Builder();
 
-    private static final HashMap<String, InputData> CookieList = new HashMap<>();
-    private static final HashMap<String, String> CookieIDList = new HashMap<>();
-    private static final HashMap<String, String> m3u8List = new HashMap<>();
-    private static final HashMap<String, String> m3u8VideoList = new HashMap<>();
-    private static final HashMap<String, String> m3u8AudioList = new HashMap<>();
+    private static final HashMap<String, VideoData> DataList = new HashMap<>();
 
     private static final Pattern matcher_1 = Pattern.compile("(\\d+)_(.+)");
 
@@ -32,7 +32,13 @@ public class Main {
     private static final Pattern matcher_6 = Pattern.compile("#EXT-X-KEY:METHOD=AES-128,URI=\"(.+)\",IV=(.+)");
     private static final Pattern matcher_7 = Pattern.compile("#EXT-X-STREAM-INF:BANDWIDTH=(\\d+),AVERAGE-BANDWIDTH=(\\d+),CODECS=\"(.+)\",RESOLUTION=(.+),FRAME-RATE=(.+),AUDIO=\"(.+)\"");
 
-    public static void main(String[] args) {
+    private static final Gson gson = new Gson();
+
+    private static YamlMapping input;
+
+    public static void main(String[] args) throws Exception {
+
+        input = Yaml.createYamlInput(new File("./config.yml")).readYamlMapping();
 
         // 定期お掃除
         new Thread(()->{
@@ -41,29 +47,37 @@ public class Main {
                 @Override
                 public void run() {
 
-                    final HashMap<String, String> temp = new HashMap<>(m3u8List);
+                    final HashMap<String, VideoData> temp = new HashMap<>(DataList);
 
-                    temp.forEach((id, m3u8)->{
-                        final Matcher matcher = matcher_1.matcher(id);
-                        if (matcher.find()){
-                            return;
-                        }
-                        final String timeStr = matcher.group(1);
-                        long l = Long.parseLong(timeStr);
+                    temp.forEach((id, data)->{
+
                         long time = new Date().getTime();
 
-                        if ((time - l) >= 86400000L){
-                            String s = CookieIDList.get(id);
-                            if (s != null){
-                                CookieIDList.remove(id);
-                                CookieList.remove(id);
-                            }
-                            m3u8List.remove(id);
-                            m3u8VideoList.remove(id);
-                            m3u8AudioList.remove(id);
+                        if ((data.getExpiryDate() - time) <= 0L){
+                            DataList.remove(id);
                         }
 
                     });
+
+                    new Thread(()->{
+                        JedisPool jedisPool = new JedisPool(input.string("RedisServer"), input.integer("RedisPort"));
+                        Jedis jedis = jedisPool.getResource();
+                        if (!input.string("RedisPass").isEmpty()){
+                            jedis.auth(input.string("RedisPass"));
+                        }
+
+                        jedis.keys("nico-hls:*").forEach(key -> {
+                            VideoData json = gson.fromJson(jedis.get(key), VideoData.class);
+                            long time = new Date().getTime();
+                            //System.out.println("debug time : " + (json.getExpiryDate() - time));
+                            if ((json.getExpiryDate() - time) <= 0L){
+                                jedis.del(key);
+                            }
+                        });
+
+                        jedis.close();
+                        jedisPool.close();
+                    }).start();
                 }
             }, 0L, 10000L);
         }).start();
@@ -101,20 +115,19 @@ public class Main {
                             if (matcher1.find()) {
 
                                 String group = matcher1.group(2);
-                                Matcher matcher = matcher_1.matcher("./" + group.replaceAll("%22", "").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
+                                String FileNameText = "./" + group.replaceAll("%22", "").replaceAll("\\./", "").replaceAll("\\.\\./", "");
+                                Matcher matcher = matcher_1.matcher(FileNameText);
 
 
                                 if (matcher.find()){
                                     String fileId = matcher.group(1) + "_" + matcher.group(2).split("/")[0];
-                                    System.out.println(fileId);
-                                    String s = m3u8List.get(fileId);
-                                    if (s != null){
-                                        //System.out.println("---- debug");
-                                        //System.out.println(s);
-                                        //System.out.println("---- ");
-                                        Matcher matcher4 = matcher_7.matcher(s);
-                                        String ContentType = "application/vnd.apple.mpegurl";
-                                        String m3u8Text = "";
+                                    //System.out.println(fileId);
+                                    // まずはHashmapを見に行く
+                                    if (DataList.get(fileId) != null){
+                                        //System.out.println("hashmap");
+                                        Matcher matcher4 = matcher_7.matcher(DataList.get(fileId).getMainM3u8());
+                                        String m3u8Text = "#EXTM3U\n/video/"+fileId+"/sub.m3u8";
+
                                         if (matcher4.find()){
                                             m3u8Text = "#EXTM3U\n" +
                                                     "#EXT-X-VERSION:6\n" +
@@ -125,17 +138,17 @@ public class Main {
                                         }
 
                                         if (group.endsWith("main.m3u8")){
-                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: "+ContentType+";\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
                                             out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
                                         } else if (group.endsWith("sub.m3u8")) {
-                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: "+ContentType+";\n\n").getBytes(StandardCharsets.UTF_8));
-                                            out.write(s.getBytes(StandardCharsets.UTF_8));
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(DataList.get(fileId).getMainM3u8().getBytes(StandardCharsets.UTF_8));
                                         } else if (group.endsWith("video.m3u8")) {
-                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: "+ContentType+";\n\n").getBytes(StandardCharsets.UTF_8));
-                                            out.write(m3u8VideoList.get(fileId).getBytes(StandardCharsets.UTF_8));
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(DataList.get(fileId).getVideoM3u8().getBytes(StandardCharsets.UTF_8));
                                         } else if (group.endsWith("audio.m3u8")) {
-                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: "+ContentType+";\n\n").getBytes(StandardCharsets.UTF_8));
-                                            out.write(m3u8AudioList.get(fileId).getBytes(StandardCharsets.UTF_8));
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(DataList.get(fileId).getAudioM3u8().getBytes(StandardCharsets.UTF_8));
                                         } else {
                                             out.write(("HTTP/"+httpVersion+" 404 Not Found\nContent-Type: text/plain; charset=utf-8\n\n404").getBytes(StandardCharsets.UTF_8));
                                         }
@@ -147,9 +160,60 @@ public class Main {
 
                                         return;
                                     }
+
+                                    // HashMapにない場合はRedisを見に行く
+                                    JedisPool jedisPool = new JedisPool(input.string("RedisServer"), input.integer("RedisPort"));
+                                    Jedis jedis = jedisPool.getResource();
+                                    if (!input.string("RedisPass").isEmpty()){
+                                        jedis.auth(input.string("RedisPass"));
+                                    }
+
+                                    String s1 = jedis.get("nico-hls:" + fileId);
+                                    if (s1 != null){
+
+                                        VideoData json = gson.fromJson(s1, VideoData.class);
+                                        Matcher matcher4 = matcher_7.matcher(json.getMainM3u8());
+                                        String m3u8Text = "#EXTM3U\n/video/"+fileId+"/sub.m3u8";
+
+                                        if (matcher4.find()){
+                                            m3u8Text = "#EXTM3U\n" +
+                                                    "#EXT-X-VERSION:6\n" +
+                                                    "#EXT-X-INDEPENDENT-SEGMENTS\n" +
+                                                    "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio-aac-64kbps\",NAME=\"Main Audio\",DEFAULT=YES,URI=\"/video/"+fileId+"/audio.m3u8\"\n" +
+                                                    "#EXT-X-STREAM-INF:BANDWIDTH="+matcher4.group(1)+",AVERAGE-BANDWIDTH="+matcher4.group(2)+",CODECS=\""+matcher4.group(3)+"\",RESOLUTION="+matcher4.group(4)+",FRAME-RATE="+matcher4.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
+                                                    "/video/"+fileId+"/sub.m3u8";
+                                        }
+
+                                        if (group.endsWith("main.m3u8")){
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
+                                        } else if (group.endsWith("sub.m3u8")) {
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(json.getMainM3u8().getBytes(StandardCharsets.UTF_8));
+                                        } else if (group.endsWith("video.m3u8")) {
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(json.getVideoM3u8().getBytes(StandardCharsets.UTF_8));
+                                        } else if (group.endsWith("audio.m3u8")) {
+                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
+                                            out.write(json.getAudioM3u8().getBytes(StandardCharsets.UTF_8));
+                                        } else {
+                                            out.write(("HTTP/"+httpVersion+" 404 Not Found\nContent-Type: text/plain; charset=utf-8\n\n404").getBytes(StandardCharsets.UTF_8));
+                                        }
+
+                                        out.flush();
+                                        out.close();
+                                        in.close();
+                                        sock.close();
+
+                                        return;
+                                    }
+                                    jedis.close();
+                                    jedisPool.close();
                                 }
 
-                                File file = new File("./" + group.replaceAll("%22", "").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
+                                // それでもない場合はファイルの存在確認をしてファイルの中身または404を返す
+
+                                File file = new File(FileNameText);
                                 //System.out.println("./" + group.replaceAll("%22","").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
                                 if (file.exists() && !file.isDirectory()){
                                     String ContentType = "application/octet-stream";
@@ -165,7 +229,7 @@ public class Main {
                                     out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: "+ContentType+";\n\n").getBytes(StandardCharsets.UTF_8));
 
                                     if (matcher1.group(1).equals("GET")){
-                                        FileInputStream stream = new FileInputStream("./" + group.replaceAll("%22","").replaceAll("\\./", "").replaceAll("\\.\\./", ""));
+                                        FileInputStream stream = new FileInputStream(FileNameText);
                                         out.write(stream.readAllBytes());
                                         stream.close();
                                     }
@@ -211,12 +275,38 @@ public class Main {
                                 final String RequestURI = split[0];
                                 //System.out.println(RequestURI);
                                 final String RequestHost = split[1];
-                                InputData inputData = CookieList.get(RequestURI.split("/")[1]);
-                                if (inputData == null){
-                                    inputData = CookieList.get(RequestURI.split("/")[2]);
+
+                                final String[] URIText = RequestURI.split("/");
+
+                                VideoData[] inputData = {null};
+                                DataList.forEach((id, videoData)->{
+                                    if (URIText[1].equals(videoData.getCookieID()) || URIText[2].equals(videoData.getCookieID())){
+                                        inputData[0] = videoData;
+                                    }
+                                });
+
+                                // HashMapにない場合はRedisを見に行く
+                                JedisPool jedisPool = new JedisPool(input.string("RedisServer"), input.integer("RedisPort"));
+                                Jedis jedis = jedisPool.getResource();
+                                if (!input.string("RedisPass").isEmpty()){
+                                    jedis.auth(input.string("RedisPass"));
                                 }
 
-                                if (inputData == null){
+                                jedis.keys("nico-hls:*").forEach(key -> {
+                                    if (inputData[0] != null){
+                                        return;
+                                    }
+
+                                    VideoData json = gson.fromJson(jedis.get(key), VideoData.class);
+                                    if (json.getCookieID().equals(URIText[1]) || json.getCookieID().equals(URIText[2])){
+                                        inputData[0] = json;
+                                    }
+                                });
+
+                                jedis.close();
+                                jedisPool.close();
+
+                                if (inputData[0] == null){
                                     out.write(("HTTP/"+httpVersion+" 404 Not Found\nContent-Type: text/plain; charset=utf-8\n\n404").getBytes(StandardCharsets.UTF_8));
                                     out.flush();
                                     out.close();
@@ -225,10 +315,9 @@ public class Main {
                                     return;
                                 }
                                 //System.out.println(inputData);
-                                final OkHttpClient client = inputData.getProxy() != null ? builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(inputData.getProxy().split(":")[0], Integer.parseInt(inputData.getProxy().split(":")[1])))).build() : new OkHttpClient();
-                                final JsonElement json = new Gson().fromJson(inputData.getCookie(), JsonElement.class);
-                                final String nicosid = json.getAsJsonObject().get("nicosid").getAsString();
-                                final String domand_bid = json.getAsJsonObject().get("domand_bid").getAsString();
+                                final OkHttpClient client = inputData[0].getProxyIP() != null ? builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(inputData[0].getProxyIP(), inputData[0].getProxyPort()))).build() : new OkHttpClient();
+                                final String nicosid = inputData[0].getCookieNicosid();
+                                final String domand_bid = inputData[0].getCookieDomand_bid();
 
                                 Request request = new Request.Builder()
                                         .url("https://"+ RequestHost + RequestURI)
@@ -388,8 +477,16 @@ public class Main {
                             }
                             audio_m3u8 = sb2.toString();
 
-                            m3u8VideoList.put(fileId, video_m3u8);
-                            m3u8AudioList.put(fileId, audio_m3u8);
+                            VideoData videoData = new VideoData();
+                            videoData.setExpiryDate(new Date().getTime() + 86400000);
+                            videoData.setID(fileId);
+                            videoData.setCookieID(CookieID);
+                            videoData.setVideoM3u8(video_m3u8);
+                            videoData.setAudioM3u8(audio_m3u8);
+                            videoData.setProxyIP(inputData.getProxy() != null ? inputData.getProxy().split(":")[0] : null);
+                            videoData.setProxyPort(inputData.getProxy() != null ? Integer.parseInt(inputData.getProxy().split(":")[1]) : 3128);
+                            videoData.setCookieNicosid(nicosid);
+                            videoData.setCookieDomand_bid(domand_bid);
 
                             try {
                                 //System.out.println(json.getAsJsonObject().get("MainM3U8").getAsString());
@@ -406,16 +503,29 @@ public class Main {
                                             "#EXT-X-STREAM-INF:BANDWIDTH="+matcher.group(1)+",AVERAGE-BANDWIDTH="+matcher.group(2)+",CODECS=\""+matcher.group(3)+"\",RESOLUTION="+matcher.group(4)+",FRAME-RATE="+matcher.group(5)+",AUDIO=\"audio-aac-64kbps\"\n" +
                                             "/video/"+fileId+"/video.m3u8";
                                 }
-
-                                CookieList.put(CookieID, inputData);
-                                //System.out.println("de1 : " + CookieID);
-                                CookieIDList.put(fileId, CookieID);
-
-                                m3u8List.put(fileId, m3u8);
+                                videoData.setMainM3u8(m3u8);
 
                             } catch (Exception e){
                                 //e.printStackTrace();
                             }
+
+                            //System.out.println("debug");
+                            DataList.put(fileId, videoData);
+                            new Thread(()->{
+                                //System.out.println(input.string("RedisServer") + " / " + input.integer("RedisPort"));
+                                System.out.println("!");
+
+                                JedisPool jedisPool = new JedisPool(input.string("RedisServer"), input.integer("RedisPort"));
+                                Jedis jedis = jedisPool.getResource();
+                                if (!input.string("RedisPass").isEmpty()){
+                                    jedis.auth(input.string("RedisPass"));
+                                }
+
+                                jedis.set("nico-hls:"+videoData.getID(), gson.toJson(videoData));
+                                jedis.close();
+                                jedisPool.close();
+
+                            }).start();
 
                             String host = "n.nicovrc.net";
                             if (new File("./host.txt").exists()){
@@ -446,7 +556,8 @@ public class Main {
                 }
             }
         } catch (Exception e){
-
+            //e.printStackTrace();
         }
+
     }
 }
