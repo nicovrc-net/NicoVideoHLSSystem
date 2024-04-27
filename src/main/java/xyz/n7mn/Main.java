@@ -79,7 +79,7 @@ public class Main {
                         jedisPool.close();
                     }).start();
                 }
-            }, 0L, 10000L);
+            }, 0L, 60000L);
         }).start();
 
         // HTTP通信受け取り
@@ -172,6 +172,7 @@ public class Main {
                                     if (s1 != null){
 
                                         VideoData json = gson.fromJson(s1, VideoData.class);
+                                        DataList.put(json.getID(), json);
                                         Matcher matcher4 = matcher_7.matcher(json.getMainM3u8());
                                         String m3u8Text = "#EXTM3U\n/video/"+fileId+"/sub.m3u8";
 
@@ -300,6 +301,7 @@ public class Main {
                                     VideoData json = gson.fromJson(jedis.get(key), VideoData.class);
                                     if (json.getCookieID().equals(URIText[1]) || json.getCookieID().equals(URIText[2])){
                                         inputData[0] = json;
+                                        DataList.put(json.getID(), json);
                                     }
                                 });
 
