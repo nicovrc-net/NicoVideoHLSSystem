@@ -32,6 +32,8 @@ public class Main {
     private static final Pattern matcher_6 = Pattern.compile("#EXT-X-KEY:METHOD=AES-128,URI=\"(.+)\",IV=(.+)");
     private static final Pattern matcher_7 = Pattern.compile("#EXT-X-STREAM-INF:BANDWIDTH=(\\d+),AVERAGE-BANDWIDTH=(\\d+),CODECS=\"(.+)\",RESOLUTION=(.+),FRAME-RATE=(.+),AUDIO=\"(.+)\"");
 
+    private static final Pattern matcher_8 = Pattern.compile("[uU]ser-[aA]gent: (VLC|vlc)");
+
     private static final Gson gson = new Gson();
 
     private static YamlMapping input;
@@ -107,6 +109,7 @@ public class Main {
                             Matcher matcher1 = matcher_2.matcher(httpRequest);
                             Matcher matcher2 = matcher_3.matcher(httpRequest);
                             Matcher matcher3 = matcher_4.matcher(httpRequest);
+                            Matcher matcher5 = matcher_8.matcher(httpRequest);
 
                             final String httpVersion = "1." + (matcher2.find() ? matcher2.group(1) : "1");
 
@@ -139,7 +142,11 @@ public class Main {
 
                                         if (group.endsWith("main.m3u8")){
                                             out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
-                                            out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
+                                            if (!matcher5.find()){
+                                                out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
+                                            } else {
+                                                out.write(DataList.get(fileId).getMainM3u8().getBytes(StandardCharsets.UTF_8));
+                                            }
                                         } else if (group.endsWith("sub.m3u8")) {
                                             out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
                                             out.write(DataList.get(fileId).getMainM3u8().getBytes(StandardCharsets.UTF_8));
@@ -187,7 +194,11 @@ public class Main {
 
                                         if (group.endsWith("main.m3u8")){
                                             out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
-                                            out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
+                                            if (!matcher5.find()){
+                                                out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
+                                            } else{
+                                                out.write(json.getMainM3u8().getBytes(StandardCharsets.UTF_8));
+                                            }
                                         } else if (group.endsWith("sub.m3u8")) {
                                             out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
                                             out.write(json.getMainM3u8().getBytes(StandardCharsets.UTF_8));
