@@ -34,6 +34,8 @@ public class Main {
 
     private static final Pattern matcher_8 = Pattern.compile("[uU]ser-[aA]gent: (VLC|vlc)");
 
+    private static final Pattern matcher_9 = Pattern.compile("nico-hls:(\\d+)_(.+)");
+
     private static final Gson gson = new Gson();
 
     private static YamlMapping input;
@@ -69,12 +71,15 @@ public class Main {
                         }
 
                         jedis.keys("nico-hls:*").forEach(key -> {
-                            VideoData json = gson.fromJson(jedis.get(key), VideoData.class);
-                            long time = new Date().getTime();
-                            //System.out.println("debug time : " + (json.getExpiryDate() - time));
-                            if ((json.getExpiryDate() - time) <= 0L){
-                                jedis.del(key);
+                            Matcher matcher = matcher_9.matcher(key);
+                            if (matcher.find()){
+                                long time = new Date().getTime();
+                                //System.out.println("debug time : " + ((Long.parseLong(matcher.group(1)) - time)));
+                                if ((Long.parseLong(matcher.group(1)) - time) >= 86400000L){
+                                    jedis.del(key);
+                                }
                             }
+
                         });
 
                         jedis.close();
