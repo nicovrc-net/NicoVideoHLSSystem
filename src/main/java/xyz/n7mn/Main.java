@@ -74,7 +74,7 @@ public class Main {
                             Matcher matcher = matcher_9.matcher(key);
                             if (matcher.find()){
                                 long time = new Date().getTime();
-                                System.out.println("debug time : " + ((time - Long.parseLong(matcher.group(1)))));
+                                //System.out.println("debug time : " + ((time - Long.parseLong(matcher.group(1)))));
                                 if ((time - Long.parseLong(matcher.group(1))) >= 86400000L){
                                     jedis.del(key);
                                 }
