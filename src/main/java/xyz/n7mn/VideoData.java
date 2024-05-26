@@ -14,6 +14,7 @@ public class VideoData {
     private int ProxyPort;
     private String CookieNicosid;
     private String CookieDomand_bid;
+    private boolean isVRC;
 
     public VideoData(){
         this.ExpiryDate = new Date().getTime() + 86400000;
@@ -119,5 +120,13 @@ public class VideoData {
 
     public void setCookieDomand_bid(String cookieDomand_bid) {
         CookieDomand_bid = cookieDomand_bid;
+    }
+
+    public boolean isVRC(){
+        return isVRC;
+    }
+
+    public void setVRC(boolean VRC) {
+        isVRC = VRC;
     }
 }

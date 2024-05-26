@@ -145,10 +145,12 @@ public class Main {
                                                     "/video/"+fileId+"/sub.m3u8";
                                         }
 
-                                        if (group.endsWith("main.m3u8")){
-                                            out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
-                                            if (!matcher5.find()){
+                                        if (group.endsWith("main.m3u8")) {
+                                            out.write(("HTTP/" + httpVersion + " 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
+                                            if (!matcher5.find()) {
                                                 out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
+                                            } else if (!DataList.get(fileId).isVRC()) {
+                                                out.write(DataList.get(fileId).getMainM3u8().getBytes(StandardCharsets.UTF_8));
                                             } else {
                                                 out.write(DataList.get(fileId).getMainM3u8().getBytes(StandardCharsets.UTF_8));
                                             }
@@ -199,9 +201,11 @@ public class Main {
 
                                         if (group.endsWith("main.m3u8")){
                                             out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
-                                            if (!matcher5.find()){
+                                            if (!matcher5.find()) {
                                                 out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
-                                            } else{
+                                            } else if (!json.isVRC()){
+                                                out.write(json.getMainM3u8().getBytes(StandardCharsets.UTF_8));
+                                            } else {
                                                 out.write(json.getMainM3u8().getBytes(StandardCharsets.UTF_8));
                                             }
                                         } else if (group.endsWith("sub.m3u8")) {
@@ -505,6 +509,7 @@ public class Main {
                             videoData.setProxyPort(inputData.getProxy() != null ? Integer.parseInt(inputData.getProxy().split(":")[1]) : 3128);
                             videoData.setCookieNicosid(nicosid);
                             videoData.setCookieDomand_bid(domand_bid);
+                            videoData.setVRC(inputData.isVRC());
 
                             try {
                                 //System.out.println(json.getAsJsonObject().get("MainM3U8").getAsString());
@@ -531,7 +536,7 @@ public class Main {
                             DataList.put(fileId, videoData);
                             new Thread(()->{
                                 //System.out.println(input.string("RedisServer") + " / " + input.integer("RedisPort"));
-                                System.out.println("!");
+                                //System.out.println("!");
 
                                 JedisPool jedisPool = new JedisPool(input.string("RedisServer"), input.integer("RedisPort"));
                                 Jedis jedis = jedisPool.getResource();
