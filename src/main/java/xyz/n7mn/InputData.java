@@ -6,6 +6,8 @@ public class InputData {
     private String Cookie;
     private String Proxy;
 
+    private boolean isVRC;
+
     public String getVideoURL() {
         return VideoURL;
     }
@@ -36,5 +38,13 @@ public class InputData {
 
     public void setProxy(String proxy) {
         Proxy = proxy;
+    }
+
+    public boolean isVRC() {
+        return isVRC;
+    }
+
+    public void setVRC(boolean VRC) {
+        isVRC = VRC;
     }
 }
