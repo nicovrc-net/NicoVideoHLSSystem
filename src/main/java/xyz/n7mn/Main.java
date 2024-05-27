@@ -147,7 +147,7 @@ public class Main {
 
                                         if (group.endsWith("main.m3u8")) {
                                             out.write(("HTTP/" + httpVersion + " 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
-                                            if (!matcher5.find()) {
+                                            if (!matcher5.find() && DataList.get(fileId).isVRC()) {
                                                 out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
                                             } else if (!DataList.get(fileId).isVRC()) {
                                                 out.write(DataList.get(fileId).getMainM3u8().getBytes(StandardCharsets.UTF_8));
@@ -201,7 +201,7 @@ public class Main {
 
                                         if (group.endsWith("main.m3u8")){
                                             out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: application/vnd.apple.mpegurl;\n\n").getBytes(StandardCharsets.UTF_8));
-                                            if (!matcher5.find()) {
+                                            if (!matcher5.find() && DataList.get(fileId).isVRC()) {
                                                 out.write(m3u8Text.getBytes(StandardCharsets.UTF_8));
                                             } else if (!json.isVRC()){
                                                 out.write(json.getMainM3u8().getBytes(StandardCharsets.UTF_8));
