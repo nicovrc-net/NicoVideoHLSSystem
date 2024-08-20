@@ -55,6 +55,31 @@ public class Main {
 
                     temp.forEach((id, data)->{
 
+                        String proxyIP = data.getProxyIP();
+                        int proxyPort = data.getProxyPort();
+
+                        final OkHttpClient client = proxyIP != null ? builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyIP, proxyPort))).build() : new OkHttpClient();
+
+                        Request request = new Request.Builder()
+                                .url("https://www.nicovideo.jp/")
+                                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:129.0) Gecko/20100101 Firefox/129.0")
+                                .build();
+
+                        try {
+                            Response response = client.newCall(request).execute();
+                            if (response.body() != null){
+                                if (response.code() <= 199 || response.code() >= 400){
+                                    DataList.remove(id);
+                                    return;
+                                }
+                            }
+                            response.close();
+                        } catch (Exception e){
+                            DataList.remove(id);
+                            return;
+                        }
+
+
                         long time = new Date().getTime();
 
                         if ((data.getExpiryDate() - time) <= 0L){
@@ -73,6 +98,32 @@ public class Main {
                         jedis.keys("nico-hls:*").forEach(key -> {
                             Matcher matcher = matcher_9.matcher(key);
                             if (matcher.find()){
+                                VideoData data = gson.fromJson(jedis.get(key), VideoData.class);
+
+                                String proxyIP = data.getProxyIP();
+                                int proxyPort = data.getProxyPort();
+
+                                final OkHttpClient client = proxyIP != null ? builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyIP, proxyPort))).build() : new OkHttpClient();
+
+                                Request request = new Request.Builder()
+                                        .url("https://www.nicovideo.jp/")
+                                        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:129.0) Gecko/20100101 Firefox/129.0")
+                                        .build();
+
+                                try {
+                                    Response response = client.newCall(request).execute();
+                                    if (response.body() != null){
+                                        if (response.code() <= 199 || response.code() >= 400){
+                                            DataList.remove(key);
+                                            return;
+                                        }
+                                    }
+                                    response.close();
+                                } catch (Exception e){
+                                    DataList.remove(key);
+                                    return;
+                                }
+
                                 long time = new Date().getTime();
                                 //System.out.println("debug time : " + ((time - Long.parseLong(matcher.group(1)))));
                                 if ((time - Long.parseLong(matcher.group(1))) >= 86400000L){
@@ -131,9 +182,10 @@ public class Main {
                                     String fileId = matcher.group(1) + "_" + matcher.group(2).split("/")[0];
                                     //System.out.println(fileId);
                                     // まずはHashmapを見に行く
-                                    if (DataList.get(fileId) != null){
+                                    final VideoData videoData = DataList.get(fileId);
+                                    if (videoData != null){
                                         //System.out.println("hashmap");
-                                        Matcher matcher4 = matcher_7.matcher(DataList.get(fileId).getMainM3u8());
+                                        Matcher matcher4 = matcher_7.matcher(videoData.getMainM3u8());
                                         String m3u8Text = "#EXTM3U\n/video/"+fileId+"/sub.m3u8";
 
                                         if (matcher4.find()){
