@@ -44,102 +44,56 @@ public class Main {
 
         input = Yaml.createYamlInput(new File("./config.yml")).readYamlMapping();
 
-        // 定期お掃除
-        new Thread(()->{
-            Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask() {
-                @Override
-                public void run() {
+        if (input.string("Refresh").toLowerCase(Locale.ROOT).equals("true")){
 
-                    final HashMap<String, VideoData> temp = new HashMap<>(DataList);
+            // 定期お掃除
+            new Thread(()->{
+                Timer timer = new Timer();
+                timer.scheduleAtFixedRate(new TimerTask() {
+                    @Override
+                    public void run() {
 
-                    temp.forEach((id, data)->{
+                        final HashMap<String, VideoData> temp = new HashMap<>(DataList);
 
-                        String proxyIP = data.getProxyIP();
-                        int proxyPort = data.getProxyPort();
+                        temp.forEach((id, data)->{
 
-                        final OkHttpClient client = proxyIP != null ? builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyIP, proxyPort))).build() : new OkHttpClient();
+                            long time = new Date().getTime();
 
-                        Request request = new Request.Builder()
-                                .url("https://www.nicovideo.jp/")
-                                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:129.0) Gecko/20100101 Firefox/129.0")
-                                .build();
-
-                        try {
-                            Response response = client.newCall(request).execute();
-                            if (response.body() != null){
-                                if (response.code() <= 199 || response.code() >= 400){
-                                    DataList.remove(id);
-                                    return;
-                                }
-                            }
-                            response.close();
-                        } catch (Exception e){
-                            DataList.remove(id);
-                            return;
-                        }
-
-
-                        long time = new Date().getTime();
-
-                        if ((data.getExpiryDate() - time) <= 0L){
-                            DataList.remove(id);
-                        }
-
-                    });
-
-                    new Thread(()->{
-                        JedisPool jedisPool = new JedisPool(input.string("RedisServer"), input.integer("RedisPort"));
-                        Jedis jedis = jedisPool.getResource();
-                        if (!input.string("RedisPass").isEmpty()){
-                            jedis.auth(input.string("RedisPass"));
-                        }
-
-                        jedis.keys("nico-hls:*").forEach(key -> {
-                            Matcher matcher = matcher_9.matcher(key);
-                            if (matcher.find()){
-                                VideoData data = gson.fromJson(jedis.get(key), VideoData.class);
-
-                                String proxyIP = data.getProxyIP();
-                                int proxyPort = data.getProxyPort();
-
-                                final OkHttpClient client = proxyIP != null ? builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyIP, proxyPort))).build() : new OkHttpClient();
-
-                                Request request = new Request.Builder()
-                                        .url("https://www.nicovideo.jp/")
-                                        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:129.0) Gecko/20100101 Firefox/129.0")
-                                        .build();
-
-                                try {
-                                    Response response = client.newCall(request).execute();
-                                    if (response.body() != null){
-                                        if (response.code() <= 199 || response.code() >= 400){
-                                            DataList.remove(key);
-                                            return;
-                                        }
-                                    }
-                                    response.close();
-                                } catch (Exception e){
-                                    DataList.remove(key);
-                                    return;
-                                }
-
-                                long time = new Date().getTime();
-                                //System.out.println("debug time : " + ((time - Long.parseLong(matcher.group(1)))));
-                                if ((time - Long.parseLong(matcher.group(1))) >= 86400000L){
-                                    jedis.del(key);
-                                }
+                            if ((data.getExpiryDate() - time) <= 0L){
+                                DataList.remove(id);
                             }
 
                         });
 
-                        jedis.close();
-                        jedisPool.close();
-                    }).start();
-                }
-            }, 0L, 60000L);
-        }).start();
+                        if (input.string("RefreshRedis").toLowerCase(Locale.ROOT).equals("true")){
+                            new Thread(()->{
+                                JedisPool jedisPool = new JedisPool(input.string("RedisServer"), input.integer("RedisPort"));
+                                Jedis jedis = jedisPool.getResource();
+                                if (!input.string("RedisPass").isEmpty()){
+                                    jedis.auth(input.string("RedisPass"));
+                                }
 
+                                jedis.keys("nico-hls:*").forEach(key -> {
+                                    Matcher matcher = matcher_9.matcher(key);
+                                    if (matcher.find()){
+                                        long time = new Date().getTime();
+                                        //System.out.println("debug time : " + ((time - Long.parseLong(matcher.group(1)))));
+                                        if ((time - Long.parseLong(matcher.group(1))) >= 86400000L){
+                                            jedis.del(key);
+                                        }
+                                    }
+
+                                });
+
+                                jedis.close();
+                                jedisPool.close();
+                            }).start();
+                        }
+                    }
+                }, 0L, 60000L);
+            }).start();
+
+        }
         // HTTP通信受け取り
         new Thread(()->{
             try {
