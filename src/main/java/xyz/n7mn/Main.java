@@ -313,26 +313,28 @@ public class Main {
                                 });
 
                                 // HashMapにない場合はRedisを見に行く
-                                JedisPool jedisPool = new JedisPool(input.string("RedisServer"), input.integer("RedisPort"));
-                                Jedis jedis = jedisPool.getResource();
-                                if (!input.string("RedisPass").isEmpty()){
-                                    jedis.auth(input.string("RedisPass"));
+                                if (inputData[0] == null){
+                                    JedisPool jedisPool = new JedisPool(input.string("RedisServer"), input.integer("RedisPort"));
+                                    Jedis jedis = jedisPool.getResource();
+                                    if (!input.string("RedisPass").isEmpty()){
+                                        jedis.auth(input.string("RedisPass"));
+                                    }
+
+                                    jedis.keys("nico-hls:*").forEach(key -> {
+                                        if (inputData[0] != null){
+                                            return;
+                                        }
+
+                                        VideoData json = gson.fromJson(jedis.get(key), VideoData.class);
+                                        if (json.getCookieID().equals(URIText[1]) || json.getCookieID().equals(URIText[2])){
+                                            inputData[0] = json;
+                                            DataList.put(json.getID(), json);
+                                        }
+                                    });
+
+                                    jedis.close();
+                                    jedisPool.close();
                                 }
-
-                                jedis.keys("nico-hls:*").forEach(key -> {
-                                    if (inputData[0] != null){
-                                        return;
-                                    }
-
-                                    VideoData json = gson.fromJson(jedis.get(key), VideoData.class);
-                                    if (json.getCookieID().equals(URIText[1]) || json.getCookieID().equals(URIText[2])){
-                                        inputData[0] = json;
-                                        DataList.put(json.getID(), json);
-                                    }
-                                });
-
-                                jedis.close();
-                                jedisPool.close();
 
                                 if (inputData[0] == null){
                                     out.write(("HTTP/"+httpVersion+" 404 Not Found\nContent-Type: text/plain; charset=utf-8\n\n404").getBytes(StandardCharsets.UTF_8));
