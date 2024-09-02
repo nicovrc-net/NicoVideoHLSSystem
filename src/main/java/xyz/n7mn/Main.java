@@ -192,7 +192,7 @@ public class Main {
                                     if (s1 != null){
 
                                         VideoData json = gson.fromJson(s1, VideoData.class);
-                                        DataList.put(json.getID(), json);
+                                        DataList.put(fileId, json);
                                         Matcher matcher4 = matcher_7.matcher(json.getMainM3u8());
                                         String m3u8Text = "#EXTM3U\n/video/"+fileId+"/sub.m3u8";
 
