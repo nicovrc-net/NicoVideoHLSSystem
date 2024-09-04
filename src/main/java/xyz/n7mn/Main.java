@@ -366,6 +366,22 @@ public class Main {
                                     } else {
                                         out.write(("HTTP/"+httpVersion+" 404 Not Found\nContent-Type: text/plain; charset=utf-8\n\n404").getBytes(StandardCharsets.UTF_8));
                                         out.flush();
+
+                                        DataList.remove(inputData[0].getID());
+                                        try {
+                                            JedisPool jedisPool = new JedisPool(input.string("RedisServer"), input.integer("RedisPort"));
+                                            Jedis jedis = jedisPool.getResource();
+                                            if (!input.string("RedisPass").isEmpty()){
+                                                jedis.auth(input.string("RedisPass"));
+                                            }
+
+                                            jedis.del("nico-hls:"+inputData[0].getID());
+
+                                            jedis.close();
+                                            jedisPool.close();
+                                        } catch (Exception e){
+                                            // e.printStackTrace();
+                                        }
                                     }
 
                                     out.close();
