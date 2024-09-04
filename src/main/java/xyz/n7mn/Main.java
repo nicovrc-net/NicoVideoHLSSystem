@@ -355,7 +355,7 @@ public class Main {
                                         .build();
                                 Response response = client.newCall(request).execute();
                                 if (response.body() != null){
-                                    if (response.code() == 200){
+                                    if (response.code() >= 200 && response.code() <= 399){
                                         out.write(("HTTP/"+httpVersion+" 200 OK\nContent-Type: "+response.header("Content-Type")+"\n\n").getBytes(StandardCharsets.UTF_8));
 
                                         if (RequestHeader.equals("GET")){
